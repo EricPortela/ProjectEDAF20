@@ -1,5 +1,17 @@
 use hbg09;
 
+SET foreign_key_checks = 0;
+TRUNCATE Recipes;
+TRUNCATE Ingredients;
+TRUNCATE RecipeIngredient;
+TRUNCATE IngredientDeliveries;
+
+TRUNCATE Pallets;
+TRUNCATE Customers;
+TRUNCATE Orders;
+TRUNCATE OrderRecipes;
+TRUNCATE Deliveries;
+SET foreign_key_checks = 1;
 
 insert into Recipes
 values
@@ -35,8 +47,6 @@ values
         
 insert into RecipeIngredient
 values
-        ('', '', ),
-        
         ('Almond delight', 'Butter', 400),
         ('Almond delight', 'Chopped almonds', 279),
         ('Almond delight', 'Cinnamon', 10),
