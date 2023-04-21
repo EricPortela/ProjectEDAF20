@@ -228,7 +228,7 @@ public class Database {
 
 		String cookieName = req.queryParams("cookie");
 		Map<String, Integer> map = getCookiesRecipe(cookieName);
-
+		
 		System.out.println(cookieName);
 
 		if (map == null) {
@@ -243,14 +243,15 @@ public class Database {
 			System.out.println(ingredient);
 			System.out.println(amountUsed);
 
-			String updateIngredient = "UPDATE Ingredients set amountInStorage = amountInStorage-" + amountUsed
-									+ "WHERE ingredientName = ?";
+			String updateIngredient = "UPDATE Ingredients set amountInStorage = amountInStorage- ?"
+									+ " WHERE ingredientName = ?";
 
 			try (PreparedStatement ps1 = conn.prepareStatement(updateIngredient)) {
 				//Initiera transaktion genom att sätta autoCommit till false
 				conn.setAutoCommit(false);
 
-				ps1.setString(1, ingredient);
+				ps1.setInt(1, amountUsed);
+				ps1.setString(2, ingredient);
 				ps1.executeUpdate();
 
 			} catch(SQLException ex1) {
@@ -269,21 +270,30 @@ public class Database {
 		}
 
 
-		String sql = "INSERT into Pallets values(null, ?, ?, ?)";
-		try (PreparedStatement ps = conn.prepareStatement(sql)) {
+		String sql = "INSERT into Pallets(recipeName, producedDateTime, blocked) values (?, NOW(), ?)";
+		PreparedStatement ps = null;
 
+		try {
+
+			ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
 			ps.setString(1, cookieName);
-			ps.setString(2, "NOW()");
-			ps.setBoolean(3, false);
+			// ps.setString(2, "NOW()");
+			ps.setBoolean(2, false);
 
-			ps.executeUpdate(sql, PreparedStatement.RETURN_GENERATED_KEYS);
+			ps.executeUpdate();
 
 			ResultSet rs = ps.getGeneratedKeys();
 
-			//Transaktioner lyckad ==> committa
-			conn.commit();
+			if (rs.next()) {
+				int idx = rs.getInt(1);
 
-			return " {\"status \":\"ok\", \"id: \" " + rs.getInt(1) + "}";
+				System.out.println(idx);
+				
+				//Transaktioner lyckad ==> committa
+				conn.commit();
+
+				return " {\"status \":\"ok\", \"id: \" " + idx + "}";
+			}
 
 		} catch(SQLException ex3) {
 			System.out.println("Failed to execute query to create pallet...");
