@@ -146,17 +146,73 @@ public class Database {
 		return "{\"pallets\":[]}";
 	}
 
+	/*
+	 * public String reset(Request req, Response res) {
+
+        // Turn off foreign key checks
+        try(Statement stmt = conn.createStatement()){
+            stmt.execute("SET FOREIGN_KEY_CHECKS=0");
+            stmt.close();
+        }
+        catch(SQLException e){e.printStackTrace();}
+
+        // Truncate tables
+        String[] tables = {"Recipes", "Ingredients", "RecipeIngredient", "IngredientDeliveries",
+                            "Pallets", "Customers", "Orders", "OrderRecipes", "Deliveries"};
+
+        for(int i = 0; i < tables.length; i++){
+            String sql = "TRUNCATE " + tables[i] + ";";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.executeUpdate();
+            } catch(SQLException e) {
+                e.printStackTrace();
+            }
+        }
+
+        // Turn on foreign key checks
+        try(Statement stmt = conn.createStatement()){
+            stmt.execute("SET FOREIGN_KEY_CHECKS=1");
+            stmt.close();
+        }
+        catch(SQLException e){e.printStackTrace();}
+
+        return "{}";
+    } 
+	 */
+
+
+
 	public String reset(Request req, Response res) {
 
         String sql = "";
 
-        try{
-            FileReader in = new FileReader("ProjectEDAF20/initial-data.sql");
+        try {
+            FileReader in = new FileReader("../ProjectEDAF20/initial-data.sql");
             BufferedReader br = new BufferedReader(in);
             String line;
             try{
                 while((line = br.readLine()) != null){
-                    sql += line;
+
+					sql += line;
+
+					if (line.length() != 0 && line.charAt(line.length()-1) == ';') {
+
+						System.out.println(sql);
+
+						try(PreparedStatement ps = conn.prepareStatement(sql)){
+							
+							if (sql.contains("SET")) {
+								ps.execute();
+							} else {
+								ps.executeUpdate();
+							}
+
+							sql = "";
+
+						} catch(SQLException e) {
+							e.printStackTrace();
+						}
+					}
                 }
             }
             catch(IOException e){e.printStackTrace();}
@@ -173,6 +229,8 @@ public class Database {
 		String cookieName = req.queryParams("cookie");
 		Map<String, Integer> map = getCookiesRecipe(cookieName);
 
+		System.out.println(cookieName);
+
 		if (map == null) {
 			return "{\"status \":\"ok\", \"id: \" \"unknown cookie\"}";
 		}
@@ -182,7 +240,10 @@ public class Database {
 			String ingredient = e.getKey(); 
 			int amountUsed = e.getValue() * 54;
 
-			String updateIngredient = "UPDATE Ingredients set amountInStorage = amountInStorage - " + amountUsed
+			System.out.println(ingredient);
+			System.out.println(amountUsed);
+
+			String updateIngredient = "UPDATE Ingredients set amountInStorage = amountInStorage-" + amountUsed
 									+ "WHERE ingredientName = ?";
 
 			try (PreparedStatement ps1 = conn.prepareStatement(updateIngredient)) {
@@ -214,12 +275,100 @@ public class Database {
 			ps.setString(1, cookieName);
 			ps.setString(2, "NOW()");
 			ps.setBoolean(3, false);
-			ps.executeUpdate();
+
+			ps.executeUpdate(sql, PreparedStatement.RETURN_GENERATED_KEYS);
+
+			ResultSet rs = ps.getGeneratedKeys();
 
 			//Transaktioner lyckad ==> committa
 			conn.commit();
 
-			return " {\"status \":\"ok\", \"id: \" " + cookieName + "}";
+			return " {\"status \":\"ok\", \"id: \" " + rs.getInt(1) + "}";
+
+		} catch(SQLException ex3) {
+			System.out.println("Failed to execute query to create pallet...");
+			ex3.printStackTrace();
+
+			try {
+				conn.rollback();
+			} catch (SQLException ex4) {
+				System.out.println("Failed rolling back transaction!");
+				ex4.printStackTrace();
+			}
+		}
+
+		return " {\"status \":\"ok\", \"id: \" error}";
+	}
+
+
+	public String createPalettTest(String cookieName) {
+		Map<String, Integer> map = getCookiesRecipe(cookieName);
+
+		System.out.println(cookieName);
+
+		if (map == null) {
+			return "{\"status \":\"ok\", \"id: \" \"unknown cookie\"}";
+		}
+
+		for (Map.Entry<String, Integer> e: map.entrySet()) {
+			
+			String ingredient = e.getKey(); 
+			int amountUsed = e.getValue() * 54;
+
+			System.out.println(ingredient);
+			System.out.println(amountUsed);
+
+			String updateIngredient = "UPDATE Ingredients set amountInStorage = amountInStorage- ?"
+									+ " WHERE ingredientName = ?";
+
+			try (PreparedStatement ps1 = conn.prepareStatement(updateIngredient)) {
+				//Initiera transaktion genom att sätta autoCommit till false
+				conn.setAutoCommit(false);
+
+				ps1.setInt(1, amountUsed);
+				ps1.setString(2, ingredient);
+				ps1.executeUpdate();
+
+			} catch(SQLException ex1) {
+				System.out.println("Failed updating some ingredient values...");
+				ex1.printStackTrace();
+
+				try {
+					conn.rollback();
+					conn.setAutoCommit(true);
+				} catch(SQLException ex2) {
+					ex2.printStackTrace();
+				}
+				
+				return " {\"status \":\"ok\", \"id: \" error}";
+			}
+		}
+
+
+		String sql = "INSERT into Pallets(recipeName, producedDateTime, blocked) values (?, NOW(), ?)";
+		PreparedStatement ps = null;
+
+		try {
+
+			ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+			ps.setString(1, cookieName);
+			// ps.setString(2, "NOW()");
+			ps.setBoolean(2, false);
+
+			ps.executeUpdate();
+
+			ResultSet rs = ps.getGeneratedKeys();
+
+			if (rs.next()) {
+				int idx = rs.getInt(1);
+
+				System.out.println(idx);
+				
+				//Transaktioner lyckad ==> committa
+				conn.commit();
+
+				return " {\"status \":\"ok\", \"id: \" " + idx + "}";
+			}
 
 		} catch(SQLException ex3) {
 			System.out.println("Failed to execute query to create pallet...");
@@ -245,11 +394,11 @@ public class Database {
 
 		try(PreparedStatement ps = conn.prepareStatement(sql)) {
 
-			ps.setString(0, cookieName);
+			ps.setString(1, cookieName);
 			ResultSet rs = ps.executeQuery();
 
 			while(rs.next()) {
-				map.put(rs.getString(1), rs.getInt(2));
+				map.put(rs.getString(2), rs.getInt(3));
 			}
 
 			return map;
