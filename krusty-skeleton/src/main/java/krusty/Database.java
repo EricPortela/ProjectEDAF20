@@ -10,12 +10,12 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.sql.*;
 
-
 import static krusty.Jsonizer.toJson;
 
 public class Database {
 	/**
-	 * Modify it to fit your environment and then use this string when connecting to your database!
+	 * Modify it to fit your environment and then use this string when connecting to
+	 * your database!
 	 */
 	private static final String jdbcString = "jdbc:mysql://puccini.cs.lth.se/";
 
@@ -28,21 +28,20 @@ public class Database {
 	public void connect() {
 		// Connect to database here
 		try {
-        	// Connection strings for included DBMS clients:
-        	// [MySQL]       jdbc:mysql://[host]/[database]
-        	// [PostgreSQL]  jdbc:postgresql://[host]/[database]
-        	// [SQLite]      jdbc:sqlite://[filepath]
-        	
-        	// Use "jdbc:mysql://puccini.cs.lth.se/" + userName if you using our shared server
-        	// If outside, this statement will hang until timeout.
-            conn = DriverManager.getConnection 
-                (jdbcString + jdbcUsername, jdbcUsername, jdbcPassword);
-        }
-        catch (SQLException e) {
+			// Connection strings for included DBMS clients:
+			// [MySQL] jdbc:mysql://[host]/[database]
+			// [PostgreSQL] jdbc:postgresql://[host]/[database]
+			// [SQLite] jdbc:sqlite://[filepath]
+
+			// Use "jdbc:mysql://puccini.cs.lth.se/" + userName if you using our shared
+			// server
+			// If outside, this statement will hang until timeout.
+			conn = DriverManager.getConnection(jdbcString + jdbcUsername, jdbcUsername, jdbcPassword);
+		} catch (SQLException e) {
 			System.out.println("Failed to connect to database...");
-            System.err.println(e);
-            e.printStackTrace();
-        }
+			System.err.println(e);
+			e.printStackTrace();
+		}
 	}
 
 	// TODO: Implement and change output in all methods below!
@@ -54,18 +53,18 @@ public class Database {
 		try (PreparedStatement ps = conn.prepareStatement(sql)) {
 
 			ResultSet rs = ps.executeQuery();
-			//while(rs.next()) System.out.println("hej");
+			// while(rs.next()) System.out.println("hej");
 
-			String json = Jsonizer.toJson(rs, "customers"); 
+			String json = Jsonizer.toJson(rs, "customers");
 
 			return json;
-		} 
+		}
 
-		catch(SQLException ex) {
+		catch (SQLException ex) {
 			System.out.println("Failed to execute query to get customers...");
 			ex.printStackTrace();
 		}
-		
+
 		return "{}";
 	}
 
@@ -76,15 +75,15 @@ public class Database {
 		try (PreparedStatement ps = conn.prepareStatement(sql)) {
 			ResultSet rs = ps.executeQuery();
 
-			String json = Jsonizer.toJson(rs, "raw-materials"); 
+			String json = Jsonizer.toJson(rs, "raw-materials");
 
 			return json;
 
-		} catch(SQLException ex) {
+		} catch (SQLException ex) {
 			System.out.println("Failed to execute query to get raw materials...");
 			ex.printStackTrace();
 		}
-		
+
 		return "{}";
 	}
 
@@ -94,25 +93,25 @@ public class Database {
 		try (PreparedStatement ps = conn.prepareStatement(sql)) {
 			ResultSet rs = ps.executeQuery();
 
-			String json = Jsonizer.toJson(rs, "cookies"); 
+			String json = Jsonizer.toJson(rs, "cookies");
 
 			return json;
 
-		} catch(SQLException ex) {
-			System.out.println("Failed to execute query to get raw materials...");
+		} catch (SQLException ex) {
+			System.out.println("Failed to execute query to get cookies...");
 			ex.printStackTrace();
 		}
-		
+
 		return "{\"cookies\":[]}";
 	}
 
 	public String getRecipes(Request req, Response res) {
-		String sql = "SELECT RecipeIngredient.recipeName as 'cookie', " 
-					+ "RecipeIngredient.ingredientName as 'raw_material', "
-					+ "RecipeIngredient.amount as 'amount', "
-					+ "Ingredients.unit as 'unit' "
-					+ "FROM RecipeIngredient LEFT JOIN "
-					+ "Ingredients on RecipeIngredient.ingredientName = Ingredients.ingredientName";
+		String sql = "SELECT RecipeIngredient.recipeName as 'cookie', "
+				+ "RecipeIngredient.ingredientName as 'raw_material', "
+				+ "RecipeIngredient.amount as 'amount', "
+				+ "Ingredients.unit as 'unit' "
+				+ "FROM RecipeIngredient LEFT JOIN "
+				+ "Ingredients on RecipeIngredient.ingredientName = Ingredients.ingredientName";
 
 		try (PreparedStatement ps = conn.prepareStatement(sql)) {
 			ResultSet rs = ps.executeQuery();
@@ -121,86 +120,133 @@ public class Database {
 
 			return json;
 
-		} catch(SQLException ex) {
-			System.out.println("Failed to execute query to get raw materials...");
+		} catch (SQLException ex) {
+			System.out.println("Failed to execute query to get recipes...");
 			ex.printStackTrace();
 		}
-		
+
 		return "";
 	}
 
 	public String getPallets(Request req, Response res) {
-		String sql = "SELECT ";
+		String sql = "SELECT palletNo," + "From Pallets";
+		ArrayList<String> values = new ArrayList<String>();
+		// if blocked is requested, change sql directly
+		int count = 0;
+		if (req.queryParams("blocked") != null) {
+			count++;
+			sql = "Select palletNo, IF(blocked_bool_attr, 'yes', 'no') AS blocked " +
+					" From pallets";
+			values.add(req.queryParams(sql));
+		}
+		if (req.queryParams("from") != null) {
+			count++;
+			if (count > 1) {
+				sql += " AND productionDateTime <= ?";
+				values.add(req.queryParams(sql));
+			} else {
+				sql += " WHERE productionDateTime <= ?";
+				values.add(req.queryParams(sql));
+			}
 
+		}
+		if (req.queryParams("to") != null) {
+			count++;
+			if (count > 1) {
+				sql += " AND productionDateTime >= ?";
+				values.add(req.queryParams(sql));
+			} else {
+				sql += " WHERE productionDateTime >= ?";
+				values.add(req.queryParams(sql));
+			}
+
+		}
+		if (req.queryParams("cookie") != null) {
+			count++;
+			if (count > 1) {
+				sql += " AND recipeName = ?";
+				values.add(req.queryParams(sql));
+			} else {
+				sql += " WHERE recipeName = ?";
+				values.add(req.queryParams(sql));
+			}
+
+		}
+
+		// add "AND" keyword between all sql "where" commands
 		try (PreparedStatement ps = conn.prepareStatement(sql)) {
+
+			for (int i = 0; i < values.size(); i++) {
+				ps.setString(i + 1, values.get(i));
+			}
+
 			ResultSet rs = ps.executeQuery();
 
-			String json = Jsonizer.toJson(rs, "recipes"); 
+			String json = Jsonizer.toJson(rs, "pallets");
 
 			return json;
 
-		} catch(SQLException ex) {
-			System.out.println("Failed to execute query to get raw materials...");
+		} catch (SQLException ex) {
+			System.out.println("Failed to execute query to get pallets...");
 			ex.printStackTrace();
-		}		
+		}
 		return "{\"pallets\":[]}";
 	}
 
 	/*
 	 * public String reset(Request req, Response res) {
-
-        // Turn off foreign key checks
-        try(Statement stmt = conn.createStatement()){
-            stmt.execute("SET FOREIGN_KEY_CHECKS=0");
-            stmt.close();
-        }
-        catch(SQLException e){e.printStackTrace();}
-
-        // Truncate tables
-        String[] tables = {"Recipes", "Ingredients", "RecipeIngredient", "IngredientDeliveries",
-                            "Pallets", "Customers", "Orders", "OrderRecipes", "Deliveries"};
-
-        for(int i = 0; i < tables.length; i++){
-            String sql = "TRUNCATE " + tables[i] + ";";
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.executeUpdate();
-            } catch(SQLException e) {
-                e.printStackTrace();
-            }
-        }
-
-        // Turn on foreign key checks
-        try(Statement stmt = conn.createStatement()){
-            stmt.execute("SET FOREIGN_KEY_CHECKS=1");
-            stmt.close();
-        }
-        catch(SQLException e){e.printStackTrace();}
-
-        return "{}";
-    } 
+	 * 
+	 * // Turn off foreign key checks
+	 * try(Statement stmt = conn.createStatement()){
+	 * stmt.execute("SET FOREIGN_KEY_CHECKS=0");
+	 * stmt.close();
+	 * }
+	 * catch(SQLException e){e.printStackTrace();}
+	 * 
+	 * // Truncate tables
+	 * String[] tables = {"Recipes", "Ingredients", "RecipeIngredient",
+	 * "IngredientDeliveries",
+	 * "Pallets", "Customers", "Orders", "OrderRecipes", "Deliveries"};
+	 * 
+	 * for(int i = 0; i < tables.length; i++){
+	 * String sql = "TRUNCATE " + tables[i] + ";";
+	 * try (PreparedStatement ps = conn.prepareStatement(sql)) {
+	 * ps.executeUpdate();
+	 * } catch(SQLException e) {
+	 * e.printStackTrace();
+	 * }
+	 * }
+	 * 
+	 * // Turn on foreign key checks
+	 * try(Statement stmt = conn.createStatement()){
+	 * stmt.execute("SET FOREIGN_KEY_CHECKS=1");
+	 * stmt.close();
+	 * }
+	 * catch(SQLException e){e.printStackTrace();}
+	 * 
+	 * return "{}";
+	 * }
 	 */
-
-
 
 	public String reset(Request req, Response res) {
 
-        String sql = "";
+		String sql = "";
 
-        try {
-            FileReader in = new FileReader("../ProjectEDAF20/initial-data.sql");
-            BufferedReader br = new BufferedReader(in);
-            String line;
-            try{
-                while((line = br.readLine()) != null){
+		try {
+			FileReader in = new FileReader("../ProjectEDAF20/initial-data.sql");
+			BufferedReader br = new BufferedReader(in);
+			String line;
+			try {
+				while ((line = br.readLine()) != null) {
 
 					sql += line;
 
-					if (line.length() != 0 && line.charAt(line.length()-1) == ';') {
+					if (line.length() != 0 && line.charAt(line.length() - 1) == ';') {
 
 						System.out.println(sql);
 
-						try(PreparedStatement ps = conn.prepareStatement(sql)){
-							
+						try (PreparedStatement ps = conn.prepareStatement(sql)) {
+
 							if (sql.contains("SET")) {
 								ps.execute();
 							} else {
@@ -209,66 +255,65 @@ public class Database {
 
 							sql = "";
 
-						} catch(SQLException e) {
+						} catch (SQLException e) {
 							e.printStackTrace();
 						}
 					}
-                }
-            }
-            catch(IOException e){e.printStackTrace();}
-        }
-        catch(FileNotFoundException e){System.out.println("File not found");}
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		} catch (FileNotFoundException e) {
+			System.out.println("File not found");
+		}
 
-		
-
-        return "{}";
-    }
+		return "{}";
+	}
 
 	public String createPallet(Request req, Response res) {
 
 		String cookieName = req.queryParams("cookie");
 		Map<String, Integer> map = getCookiesRecipe(cookieName);
-		
+
 		System.out.println(cookieName);
 
 		if (map == null) {
 			return "{\"status \":\"ok\", \"id: \" \"unknown cookie\"}";
 		}
 
-		for (Map.Entry<String, Integer> e: map.entrySet()) {
-			
-			String ingredient = e.getKey(); 
+		for (Map.Entry<String, Integer> e : map.entrySet()) {
+
+			String ingredient = e.getKey();
 			int amountUsed = e.getValue() * 54;
 
 			System.out.println(ingredient);
 			System.out.println(amountUsed);
 
 			String updateIngredient = "UPDATE Ingredients set amountInStorage = amountInStorage- ?"
-									+ " WHERE ingredientName = ?";
+					+ " WHERE ingredientName = ?";
 
 			try (PreparedStatement ps1 = conn.prepareStatement(updateIngredient)) {
-				//Initiera transaktion genom att sätta autoCommit till false
+				// Initiera transaktion genom att sätta autoCommit till false
 				conn.setAutoCommit(false);
 
 				ps1.setInt(1, amountUsed);
 				ps1.setString(2, ingredient);
 				ps1.executeUpdate();
 
-			} catch(SQLException ex1) {
+			} catch (SQLException ex1) {
 				System.out.println("Failed updating some ingredient values...");
 				ex1.printStackTrace();
 
 				try {
 					conn.rollback();
 					conn.setAutoCommit(true);
-				} catch(SQLException ex2) {
+				} catch (SQLException ex2) {
 					ex2.printStackTrace();
 				}
-				
+
 				return " {\"status \":\"ok\", \"id: \" error}";
 			}
 		}
-
 
 		String sql = "INSERT into Pallets(recipeName, producedDateTime, blocked) values (?, NOW(), ?)";
 		PreparedStatement ps = null;
@@ -288,14 +333,14 @@ public class Database {
 				int idx = rs.getInt(1);
 
 				System.out.println(idx);
-				
-				//Transaktioner lyckad ==> committa
+
+				// Transaktioner lyckad ==> committa
 				conn.commit();
 
 				return " {\"status \":\"ok\", \"id: \" " + idx + "}";
 			}
 
-		} catch(SQLException ex3) {
+		} catch (SQLException ex3) {
 			System.out.println("Failed to execute query to create pallet...");
 			ex3.printStackTrace();
 
@@ -309,7 +354,6 @@ public class Database {
 
 		return " {\"status \":\"ok\", \"id: \" error}";
 	}
-
 
 	public String createPalettTest(String cookieName) {
 		Map<String, Integer> map = getCookiesRecipe(cookieName);
@@ -320,40 +364,39 @@ public class Database {
 			return "{\"status \":\"ok\", \"id: \" \"unknown cookie\"}";
 		}
 
-		for (Map.Entry<String, Integer> e: map.entrySet()) {
-			
-			String ingredient = e.getKey(); 
+		for (Map.Entry<String, Integer> e : map.entrySet()) {
+
+			String ingredient = e.getKey();
 			int amountUsed = e.getValue() * 54;
 
 			System.out.println(ingredient);
 			System.out.println(amountUsed);
 
 			String updateIngredient = "UPDATE Ingredients set amountInStorage = amountInStorage- ?"
-									+ " WHERE ingredientName = ?";
+					+ " WHERE ingredientName = ?";
 
 			try (PreparedStatement ps1 = conn.prepareStatement(updateIngredient)) {
-				//Initiera transaktion genom att sätta autoCommit till false
+				// Initiera transaktion genom att sätta autoCommit till false
 				conn.setAutoCommit(false);
 
 				ps1.setInt(1, amountUsed);
 				ps1.setString(2, ingredient);
 				ps1.executeUpdate();
 
-			} catch(SQLException ex1) {
+			} catch (SQLException ex1) {
 				System.out.println("Failed updating some ingredient values...");
 				ex1.printStackTrace();
 
 				try {
 					conn.rollback();
 					conn.setAutoCommit(true);
-				} catch(SQLException ex2) {
+				} catch (SQLException ex2) {
 					ex2.printStackTrace();
 				}
-				
+
 				return " {\"status \":\"ok\", \"id: \" error}";
 			}
 		}
-
 
 		String sql = "INSERT into Pallets(recipeName, producedDateTime, blocked) values (?, NOW(), ?)";
 		PreparedStatement ps = null;
@@ -373,14 +416,14 @@ public class Database {
 				int idx = rs.getInt(1);
 
 				System.out.println(idx);
-				
-				//Transaktioner lyckad ==> committa
+
+				// Transaktioner lyckad ==> committa
 				conn.commit();
 
 				return " {\"status \":\"ok\", \"id: \" " + idx + "}";
 			}
 
-		} catch(SQLException ex3) {
+		} catch (SQLException ex3) {
 			System.out.println("Failed to execute query to create pallet...");
 			ex3.printStackTrace();
 
@@ -395,25 +438,25 @@ public class Database {
 		return " {\"status \":\"ok\", \"id: \" error}";
 	}
 
-	//Returns a map containing the ingredients of the requested cookie
-	//Key = Ingredient Name, Value = Amount Of Ingredient
-	private Map<String, Integer> getCookiesRecipe(String cookieName){
+	// Returns a map containing the ingredients of the requested cookie
+	// Key = Ingredient Name, Value = Amount Of Ingredient
+	private Map<String, Integer> getCookiesRecipe(String cookieName) {
 		Map<String, Integer> map = new HashMap<>();
 
 		String sql = "SELECT * FROM RecipeIngredient WHERE recipeName = ?";
 
-		try(PreparedStatement ps = conn.prepareStatement(sql)) {
+		try (PreparedStatement ps = conn.prepareStatement(sql)) {
 
 			ps.setString(1, cookieName);
 			ResultSet rs = ps.executeQuery();
 
-			while(rs.next()) {
+			while (rs.next()) {
 				map.put(rs.getString(2), rs.getInt(3));
 			}
 
 			return map;
 
-		} catch(SQLException ex) {
+		} catch (SQLException ex) {
 			System.out.println("Failed to execute query to get cookies recipe...");
 			ex.printStackTrace();
 		}
