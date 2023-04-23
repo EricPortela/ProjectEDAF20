@@ -28,14 +28,6 @@ public class Database {
 	public void connect() {
 		// Connect to database here
 		try {
-			// Connection strings for included DBMS clients:
-			// [MySQL] jdbc:mysql://[host]/[database]
-			// [PostgreSQL] jdbc:postgresql://[host]/[database]
-			// [SQLite] jdbc:sqlite://[filepath]
-
-			// Use "jdbc:mysql://puccini.cs.lth.se/" + userName if you using our shared
-			// server
-			// If outside, this statement will hang until timeout.
 			conn = DriverManager.getConnection(jdbcString + jdbcUsername, jdbcUsername, jdbcPassword);
 		} catch (SQLException e) {
 			System.out.println("Failed to connect to database...");
@@ -44,7 +36,14 @@ public class Database {
 		}
 	}
 
-	// TODO: Implement and change output in all methods below!
+
+	/**
+	 * Returns a JSON string containing all the customers' names and addresses. Retrieves this information
+	 * from the database by executing a SQL query that selects the customerName and address columns from the Customers table.
+	 * @param req the HTTP request object
+	 * @param res the HTTP response object
+	 * @return a JSON string containing all the customers' names and addresses
+	 */
 
 	public String getCustomers(Request req, Response res) {
 
@@ -68,6 +67,16 @@ public class Database {
 		return "{}";
 	}
 
+	/**
+	 * Retrieves information about raw materials from the database and returns it as a JSON string.
+	 * The method executes a SQL query to retrieve the name, amount, and unit of all raw materials
+	 * stored in the Ingredients table of the database. The results are formatted as a JSON string
+	 * with keys "name", "amount", and "unit" corresponding to the respective columns in the database.
+	 * @param req the HTTP request object
+	 * @param res the HTTP response object
+	 * @return a JSON string representing the raw materials information, or "{}" if there was an error
+	 */
+
 	public String getRawMaterials(Request req, Response res) {
 
 		String sql = "SELECT ingredientName AS 'name', amountInStorage AS 'amount', unit FROM Ingredients;";
@@ -87,6 +96,16 @@ public class Database {
 		return "{}";
 	}
 
+
+	/**
+	 * Returns a JSON string containing a list of all available cookies.
+	 * The list is obtained from the database table "Recipes" using a SQL query.
+	 * The returned JSON string has a root element "cookies".
+	 * @param req The HTTP request object
+	 * @param res The HTTP response object
+	 * @return A JSON string containing a list of all available cookies
+	 */
+
 	public String getCookies(Request req, Response res) {
 		String sql = "SELECT recipeName AS 'name' FROM Recipes;";
 
@@ -104,6 +123,14 @@ public class Database {
 
 		return "{\"cookies\":[]}";
 	}
+
+
+	/**
+	 * Returns a JSON string representing all the recipes in the system, along with their respective ingredients and amounts.
+	 * @param req The HTTP request object.
+	 * @param res The HTTP response object.
+	 * @return A JSON string representing all the recipes in the system, or an empty string if there was an error executing the query.
+	 */
 
 	public String getRecipes(Request req, Response res) {
 		String sql = "SELECT RecipeIngredient.recipeName as 'cookie', "
@@ -127,6 +154,14 @@ public class Database {
 
 		return "";
 	}
+
+
+	/**
+	 * Retrieves a list of pallets from the database based on query parameters and returns them as JSON.
+	 * @param req The HTTP request containing the query parameters.
+	 * @param res The HTTP response to return.
+	 * @return A JSON representation of the retrieved pallets.
+	 */
 
 	public String getPallets(Request req, Response res) {
 
@@ -249,45 +284,47 @@ public class Database {
 		}
 	}
 
+
+	/**
+	 * This method handles a reset request to truncate all tables in the database and reset foreign key checks.
+	 * It executes a list of SQL queries obtained from the ResetDB class and returns a JSON response indicating the
+	 * success status of the operation.
+	 * @param req The request object containing the incoming HTTP request data.
+	 * @param res The response object containing the outgoing HTTP response data.
+	 * @return A JSON response string indicating the success status of the reset operation.
+	 */
+
 	public String reset(Request req, Response res) {
 
-		String sql = "";
+		ArrayList<String> sqlQueries = ResetDB.getResetQueries(); //SEE ResetDB.java class!
 
-		try {
-			FileReader in = new FileReader("../ProjectEDAF20/initial-data.sql");
-			BufferedReader br = new BufferedReader(in);
-			String line;
-			try {
-				while ((line = br.readLine()) != null) {
+		for (String sql: sqlQueries) {
+			try (PreparedStatement ps = conn.prepareStatement(sql)) {
 
-					sql += line;
-
-					if (line.length() != 0 && line.charAt(line.length() - 1) == ';') {
-
-						try (PreparedStatement ps = conn.prepareStatement(sql)) {
-
-							if (sql.contains("SET")) {
-								ps.execute();
-							} else {
-								ps.executeUpdate();
-							}
-
-							sql = "";
-
-						} catch (SQLException e) {
-							e.printStackTrace();
-						}
-					}
+				if (sql.contains("SET")) {
+					ps.execute();
+				} else {
+					ps.executeUpdate();
 				}
-			} catch (IOException e) {
+
+			} catch (SQLException e) {
+				System.out.println("\n\n\n");
+				System.out.println("Failed executing query: ");
+				System.out.println(sql);
 				e.printStackTrace();
 			}
-		} catch (FileNotFoundException e) {
-			System.out.println("File not found");
 		}
 
 		return "{\"status\": \"ok\" }";
 	}
+
+
+	/**
+	 * Creates a new pallet based on the specified cookie.
+	 * @param req The HTTP request.
+	 * @param res The HTTP response.
+	 * @return A JSON object containing the status of the request and the ID of the new pallet, or an error message.
+	 */
 
 	public String createPallet(Request req, Response res) {
 
@@ -372,6 +409,7 @@ public class Database {
 		return " {\"status \":\"ok\", \"id: \" error}";
 	}
 
+	// USED in createPallet()
 	// Returns a map containing the ingredients of the requested cookie
 	// Key = Ingredient Name, Value = Amount Of Ingredient
 	private Map<String, Integer> getCookiesRecipe(String cookieName) {
@@ -405,6 +443,8 @@ public class Database {
 
 	//### TEST METHODS
 
+
+	//## TEST VERSION of createPallet()
 	// public String createPalettTest(String cookieName) {
 	// 	Map<String, Integer> map = getCookiesRecipe(cookieName);
 
@@ -485,6 +525,52 @@ public class Database {
 
 
 
+
+	//### THIS RESET METHOD READ THE SQL-SCRIPT AND EXECUTE IT THEREAFTER
+	// public String reset(Request req, Response res) {
+
+	// 	String sql = "";
+
+	// 	try {
+	// 		FileReader in = new FileReader("../ProjectEDAF20/initial-data.sql");
+	// 		BufferedReader br = new BufferedReader(in);
+	// 		String line;
+	// 		try {
+	// 			while ((line = br.readLine()) != null) {
+
+	// 				sql += line;
+
+	// 				if (line.length() != 0 && line.charAt(line.length() - 1) == ';') {
+
+	// 					try (PreparedStatement ps = conn.prepareStatement(sql)) {
+
+	// 						if (sql.contains("SET")) {
+	// 							ps.execute();
+	// 						} else {
+	// 							ps.executeUpdate();
+	// 						}
+
+	// 						sql = "";
+
+	// 					} catch (SQLException e) {
+	// 						e.printStackTrace();
+	// 					}
+	// 				}
+	// 			}
+	// 		} catch (IOException e) {
+	// 			e.printStackTrace();
+	// 		}
+	// 	} catch (FileNotFoundException e) {
+	// 		System.out.println("File not found");
+	// 	}
+
+	// 	return "{\"status\": \"ok\" }";
+	// }
+
+
+
+
+	//### NOT FULLY FUNCTIONING RESET
 	/*
 	 * public String reset(Request req, Response res) {
 	 * 
