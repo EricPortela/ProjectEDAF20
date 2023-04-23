@@ -52,7 +52,6 @@ public class Database {
 		try (PreparedStatement ps = conn.prepareStatement(sql)) {
 
 			ResultSet rs = ps.executeQuery();
-			// while(rs.next()) System.out.println("hej");
 
 			String json = Jsonizer.toJson(rs, "customers");
 
@@ -230,7 +229,6 @@ public class Database {
 
 			for (int i = 0; i < values.size(); i++) {
 				ps.setString(i + 1, values.get(i));
-				System.out.println(values.get(i));
 			}
 
 			ResultSet rs = ps.executeQuery();
