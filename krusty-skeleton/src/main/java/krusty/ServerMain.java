@@ -18,8 +18,6 @@ public class ServerMain {
 		db = new Database();
 		db.connect();
 
-		db.reset(null, null); //run this line, before running the tests!!
-
 		port(PORT);
 		
 		enableCORS();
