@@ -76,3 +76,5 @@ CREATE TABLE Deliveries(
         orderId INT REFERENCES Orders(orderId),
         delivered BOOLEAN
 );
+
+--STOP
